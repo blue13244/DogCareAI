@@ -75,9 +75,20 @@ def render_result(saved):
         st.write("**이번 입력에서 보고한 변화**")
         for text in result["changes"]:
             st.write("• " + text)
-        comparison = pd.DataFrame({"내 응답": [record[c] for c in SCORES],
-                                   "같은 군집 평균": [result["pattern"]["means"][c] for c in SCORES]}, index=SCORES)
-        st.bar_chart(comparison, horizontal=True, stack=False, color=["#246C59", "#A5BDB0"])
+        comparison = pd.DataFrame({"항목": SCORES * 2,
+            "점수": [record[c] for c in SCORES] + [result["pattern"]["means"][c] for c in SCORES],
+            "비교": ["내 응답"] * len(SCORES) + ["같은 군집 평균"] * len(SCORES)})
+        st.vega_lite_chart(comparison, {
+            "mark": "bar", "height": 320,
+            "encoding": {
+                "x": {"field": "점수", "type": "quantitative", "title": "응답 점수 (3=평소)", "scale": {"domain": [0, 5]}},
+                "y": {"field": "항목", "type": "nominal", "sort": SCORES, "title": None},
+                "yOffset": {"field": "비교", "type": "nominal"},
+                "color": {"field": "비교", "type": "nominal", "legend": {"orient": "bottom", "title": None},
+                          "scale": {"domain": ["내 응답", "같은 군집 평균"], "range": ["#246C59", "#A5BDB0"]}},
+                "tooltip": [{"field": "항목"}, {"field": "비교"}, {"field": "점수", "format": ".2f"}],
+            },
+        }, width="stretch")
         st.caption("3은 평소와 같음입니다. 응답은 순서형 점수이며 양·시간의 실제 비율을 뜻하지 않습니다. 군집은 학습 자료에서 찾은 그룹입니다.")
     with similar_tab:
         st.write("학습된 입력 표현에서 가까운 가상 사례를 보여 줍니다.")
