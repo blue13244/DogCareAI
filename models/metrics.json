@@ -1,0 +1,132 @@
+{
+  "schema_version": "dogcare-demo-v1",
+  "data_kind": "가상_데모",
+  "target": "가상건강상태라벨",
+  "rows": 100,
+  "unique_ids": 100,
+  "unique_inputs": 100,
+  "evaluation_groups": 100,
+  "class_counts": {
+    "정상": 38,
+    "관찰 필요": 31,
+    "건강 이상 의심": 31
+  },
+  "cv_folds": 5,
+  "folds": [
+    {
+      "fold": 1,
+      "train_rows": 80,
+      "test_rows": 20,
+      "overlapping_groups": 0
+    },
+    {
+      "fold": 2,
+      "train_rows": 80,
+      "test_rows": 20,
+      "overlapping_groups": 0
+    },
+    {
+      "fold": 3,
+      "train_rows": 80,
+      "test_rows": 20,
+      "overlapping_groups": 0
+    },
+    {
+      "fold": 4,
+      "train_rows": 80,
+      "test_rows": 20,
+      "overlapping_groups": 0
+    },
+    {
+      "fold": 5,
+      "train_rows": 80,
+      "test_rows": 20,
+      "overlapping_groups": 0
+    }
+  ],
+  "oof_accuracy": 0.91,
+  "oof_macro_f1": 0.9040450804339693,
+  "baseline_accuracy": 0.38,
+  "classification_report": {
+    "정상": {
+      "precision": 0.8837209302325582,
+      "recall": 1.0,
+      "f1-score": 0.9382716049382716,
+      "support": 38.0
+    },
+    "관찰 필요": {
+      "precision": 0.9583333333333334,
+      "recall": 0.7419354838709677,
+      "f1-score": 0.8363636363636363,
+      "support": 31.0
+    },
+    "건강 이상 의심": {
+      "precision": 0.9090909090909091,
+      "recall": 0.967741935483871,
+      "f1-score": 0.9375,
+      "support": 31.0
+    },
+    "accuracy": 0.91,
+    "macro avg": {
+      "precision": 0.9170483908856002,
+      "recall": 0.903225806451613,
+      "f1-score": 0.9040450804339693,
+      "support": 100.0
+    },
+    "weighted avg": {
+      "precision": 0.9147154686398872,
+      "recall": 0.91,
+      "f1-score": 0.9064409371492704,
+      "support": 100.0
+    }
+  },
+  "confusion_matrix_labels": [
+    "정상",
+    "관찰 필요",
+    "건강 이상 의심"
+  ],
+  "confusion_matrix": [
+    [
+      38,
+      0,
+      0
+    ],
+    [
+      5,
+      23,
+      3
+    ],
+    [
+      0,
+      1,
+      30
+    ]
+  ],
+  "cluster_silhouette_training_only": 0.417611476404048,
+  "feature_columns": [
+    "나이_세",
+    "체중_kg",
+    "식사량",
+    "음수량",
+    "배뇨량",
+    "활동량",
+    "수면시간",
+    "증상_구토",
+    "증상_설사",
+    "증상_기침",
+    "증상_보행이상",
+    "크기",
+    "약물복용"
+  ],
+  "excluded_columns": [
+    "ID",
+    "이름",
+    "추가증상",
+    "가상건강상태라벨",
+    "판단주요특징",
+    "데이터구분"
+  ],
+  "evaluated_at_kst": "2026-10-31T11:30:02+09:00",
+  "interpretation": "가상 라벨 재현에 대한 그룹 교차검증입니다. 실제 질병·건강·진료 필요성 예측의 정확도가 아닙니다.",
+  "deployment_model": "교차검증 후 분류기·군집·검색 모델을 전체 자료로 학습했습니다. 표시 성능은 교차검증에서만 계산했습니다."
+}
