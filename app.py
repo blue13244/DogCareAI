@@ -77,7 +77,7 @@ def render_result(saved):
             st.write("• " + text)
         comparison = pd.DataFrame({"내 응답": [record[c] for c in SCORES],
                                    "같은 군집 평균": [result["pattern"]["means"][c] for c in SCORES]}, index=SCORES)
-        st.bar_chart(comparison, horizontal=True, color=["#246C59", "#A5BDB0"])
+        st.bar_chart(comparison, horizontal=True, stack=False, color=["#246C59", "#A5BDB0"])
         st.caption("3은 평소와 같음입니다. 응답은 순서형 점수이며 양·시간의 실제 비율을 뜻하지 않습니다. 군집은 학습 자료에서 찾은 그룹입니다.")
     with similar_tab:
         st.write("학습된 입력 표현에서 가까운 가상 사례를 보여 줍니다.")

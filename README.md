@@ -1,5 +1,7 @@
 # DogCare AI
 
+[공유 웹앱 열기](https://gwinweskgtxcbsz5nczny5.streamlit.app/) · [GitHub 저장소](https://github.com/blue13244/DogCareAI)
+
 강아지 설문을 입력하면 **학습된 모델로 생활 군집과 가상 사례 유형을 분석하고 비슷한 사례를 찾는** Streamlit 프로젝트입니다. 건강 참고정보에는 입력과 연결한 이유, 원문 출처를 표시합니다.
 
 현재 학습 자료는 사용자가 제공한 **가상 반려견 100건**입니다. 실제 질병이나 건강 정상 여부를 진단하지 않으며, 실제 질병 발생 확률을 제공하지 않습니다.
