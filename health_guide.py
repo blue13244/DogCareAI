@@ -1,6 +1,6 @@
 """출처가 있는 건강 참고정보. ML 분류 결과로 진료 안내를 낮추지 않는다."""
 from pathlib import Path
-import pandas as pd
+import csv
 
 GUIDE_PATH = Path(__file__).resolve().parent / "data" / "condition_guide.csv"
 SOURCES = {
@@ -46,13 +46,19 @@ def related_conditions(record: dict, red_flags=None, guide_path=GUIDE_PATH):
         "small_cough": record["크기"] == "소형견" and bool(record["증상_기침"]),
         "gait": bool(record["증상_보행이상"]),
         "gdv_signs": "복부팽창과 토하지 못하는 헛구역질" in flags,
+        "cushing_signs": record["음수량"] >= 4 and record["배뇨량"] >= 4 and record["식사량"] >= 4,
+        "vomiting_appetite": bool(record["증상_구토"]) and record["식사량"] <= 2,
+        "small_gait": record["크기"] == "소형견" and bool(record["증상_보행이상"]),
     }
-    guide = pd.read_csv(guide_path, encoding="utf-8-sig").fillna("")
     required = {"condition_id", "참고질환", "trigger", "연결이유", "확인정보", "출처명", "출처URL"}
-    if not required.issubset(guide.columns) or not guide["trigger"].isin(triggers).all():
+    with Path(guide_path).open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        columns = set(reader.fieldnames or [])
+        guide = list(reader)
+    if not required.issubset(columns) or any(row.get("trigger") not in triggers for row in guide):
         raise ValueError("condition_guide.csv의 열 또는 조건 이름이 올바르지 않습니다.")
     # CSV 조건은 고정된 키로만 해석한다. eval이나 사용자 코드 실행을 사용하지 않는다.
-    return guide.loc[guide["trigger"].map(triggers)].to_dict("records")
+    return [row for row in guide if triggers[row["trigger"]]]
 
 
 def size_guidance(size):
@@ -77,3 +83,4 @@ def daily_care(record):
         texts.append("상담 시 복용 중인 약 이름과 복용 시점을 함께 전달하세요. 앱 결과로 처방약을 중단하거나 용량을 바꾸지 마세요.")
     texts.append("체중은 같은 강아지의 이전 기록과 비교하고, 적정 체중은 체형 점수와 근육 상태를 포함해 상담하세요.")
     return texts
+

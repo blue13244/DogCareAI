@@ -9,6 +9,7 @@ from core import (DATA_PATH, MODEL_PATH, SCORES, SYMPTOMS, LABELS, FEATURES,
                   get_bundle, file_digest, analyze_record, batch_analyze, read_data)
 from health_guide import (RED_FLAGS, SOURCES, triage, related_conditions,
                           size_guidance, age_guidance, daily_care)
+from risk_data import audit_csv, template_bytes
 
 
 def presentation_text(value):
@@ -62,7 +63,7 @@ except (ValueError, OSError, ImportError) as exc:
 
 with st.sidebar:
     st.markdown("### DogCare AI")
-    page = st.radio("메뉴", ["강아지 상태 설문", "CSV 일괄 분석", "모델·데이터", "사용 안내"], label_visibility="collapsed")
+    page = st.radio("메뉴", ["강아지 상태 설문", "CSV 일괄 분석", "질병 확률 데이터", "모델·데이터", "사용 안내"], label_visibility="collapsed")
     st.divider()
     st.caption(f"학습 자료 {len(bundle['records'])}건")
     st.caption("생활 패턴과 비슷한 사례를 확인하는 교육용 프로젝트입니다.")
@@ -212,6 +213,45 @@ elif page == "CSV 일괄 분석":
             st.download_button("일괄 분석 CSV 내려받기", result.to_csv(index=False).encode("utf-8-sig"), "DogCareAI_batch.csv", "text/csv")
         except (ValueError, OSError, pd.errors.ParserError) as exc:
             st.error(presentation_text(exc))
+
+elif page == "질병 확률 데이터":
+    st.header("실제 발병 확률을 위한 데이터 점검")
+    st.write("인터넷의 질환 설명은 증상과 검사 정보를 알려 줍니다. 개별 강아지의 실제 발병 확률을 학습하려면, 기준 시점 이후 실제로 발병했는지 확인한 기록이 필요합니다.")
+    st.info("현재 제공하는 기능은 자료 구조 점검과 수집 양식입니다. 질환별 발병 예측모델은 아직 학습·검증하지 않았습니다.")
+    a,b = st.columns(2)
+    source_choice = a.radio("점검 자료", ["현재 학습 CSV", "별도 관찰 자료 CSV"])
+    horizon_days = b.selectbox("점검할 관찰 기간 (일)", [30,90,180,365], index=1,
+                              help="기준일 뒤 이 기간 안에 새로 발병했는지 기록으로 확인합니다. 이 선택만으로 예측 확률이 생성되지는 않습니다.")
+    source = DATA_PATH
+    if source_choice == "별도 관찰 자료 CSV":
+        source = st.file_uploader("진단·추적 항목이 있는 CSV", type=["csv"], key="risk_csv")
+    if source is not None:
+        try:
+            audit = audit_csv(source, horizon_days)
+            a,b,c = st.columns(3)
+            a.metric("기록", f"{audit['rows']}행")
+            b.metric("합성 데이터 표시", f"{audit['synthetic_rows']}행")
+            c.metric("실제 관찰로 표시", f"{audit['real_marked_rows']}행")
+            st.caption(audit["scope"])
+            if audit["missing_fields"]:
+                st.warning("발병 결과 점검에 필요한 열이 부족합니다. 없는 확진·발병 정보를 증상이나 인터넷 설명으로 채우지 않습니다.")
+                st.dataframe(pd.DataFrame({"부족한 항목": audit["missing_fields"]}), hide_index=True)
+            else:
+                counts = audit["outcome_counts"]
+                names = {"observed_event":"기간 내 발병 확인", "observed_no_event":"전체 기간 미발병 확인",
+                         "censored":"추적 기간 부족", "baseline_excluded":"기준 시점의 질환 없음이 확인되지 않아 제외", "invalid":"입력 오류"}
+                st.dataframe(pd.DataFrame([{"기록 구분": label, "행 수": counts.get(key,0)} for key,label in names.items()]), hide_index=True)
+                if audit["errors"]:
+                    st.dataframe(pd.DataFrame(audit["errors"]), hide_index=True)
+                st.write(audit["model_status"])
+            st.caption("관찰 기간이 끝나기 전에 추적이 중단된 기록을 미발병으로 취급하지 않습니다. 기준 시점에 이미 있던 질병도 새 발병으로 학습하지 않습니다.")
+        except (ValueError, OSError) as exc:
+            st.error(presentation_text(exc))
+    st.subheader("실제 자료 수집 양식")
+    st.download_button("진단·추적 자료 CSV 양식 내려받기", template_bytes(), "clinical_outcomes_template.csv", "text/csv")
+    st.write("한 행은 한 강아지의 한 기준일·한 질환에 대한 관찰 기록입니다. 임상 기록에 근거해 확진일과 관찰 종료일을 입력하고, 같은 강아지에는 같은 개체ID를 사용하세요.")
+    st.caption("CSV 형식이 완성되어도 확률 기능이 자동으로 활성화되지는 않습니다. 실제 자료로 질환별 모델을 개발하고, 별도 자료에서 확률 보정과 외부 검증을 해야 합니다.")
+    st.link_button("자료 작성 방법", "https://github.com/blue13244/DogCareAI/blob/main/CLINICAL_DATA.md")
 
 elif page == "모델·데이터":
     st.header("모델과 학습 데이터")

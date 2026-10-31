@@ -28,6 +28,15 @@ class AppTests(unittest.TestCase):
         self.assertEqual(len(app.exception),0)
         self.assertTrue(any('100' in str(x.value) for x in app.metric))
 
+    def test_probability_data_page(self):
+        app=AppTest.from_file(str(ROOT/'app.py'),default_timeout=60).run()
+        next(r for r in app.radio if r.label=='메뉴').set_value('질병 확률 데이터').run()
+        self.assertEqual(len(app.exception),0)
+        self.assertTrue(any('100' in str(x.value) for x in app.metric))
+        self.assertTrue(any('부족' in x.value for x in app.warning))
+        self.assertTrue(any('학습·검증하지 않았습니다' in x.value for x in app.info))
+
 
 if __name__=='__main__':
     unittest.main()
+
