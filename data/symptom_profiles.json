@@ -1,0 +1,108 @@
+{
+  "version": "symptom-comparison-v1",
+  "description": "문헌에서 선택한 징후와 응답을 비교합니다. 목록은 전체 증상이나 진단 기준을 뜻하지 않습니다.",
+  "symptoms": {
+    "food_up": {"label": "식사량 증가", "field": "식사량", "op": "increased"},
+    "food_down": {"label": "식사량 감소", "field": "식사량", "op": "decreased"},
+    "water_up": {"label": "음수량 증가", "field": "음수량", "op": "increased"},
+    "urine_up": {"label": "배뇨량 증가", "field": "배뇨량", "op": "increased"},
+    "activity_down": {"label": "활동량 감소", "field": "활동량", "op": "decreased"},
+    "vomiting": {"label": "구토", "field": "증상_구토", "op": "present"},
+    "diarrhea": {"label": "설사", "field": "증상_설사", "op": "present"},
+    "cough": {"label": "기침", "field": "증상_기침", "op": "present"},
+    "gait": {"label": "보행 이상(포괄 응답)", "field": "증상_보행이상", "op": "present"},
+    "breathing": {"label": "호흡곤란", "flag": "호흡곤란", "op": "flag"},
+    "collapse": {"label": "실신·의식저하", "flag": "실신·의식저하", "op": "flag"},
+    "bloat_retching": {"label": "복부팽창을 동반한 헛구역질", "flag": "복부팽창과 토하지 못하는 헛구역질", "op": "flag"},
+    "weight_loss": {"label": "시간에 따른 체중 감소", "op": "unassessed"},
+    "pain": {"label": "복통", "op": "unassessed"},
+    "dehydration": {"label": "탈수", "op": "unassessed"},
+    "nasal": {"label": "코 분비물", "op": "unassessed"},
+    "honking": {"label": "거위 울음 같은 마른 기침", "op": "unassessed"},
+    "stiffness": {"label": "일어날 때 뻣뻣함", "op": "unassessed"},
+    "stairs": {"label": "계단 이용·점프 어려움", "op": "unassessed"},
+    "drooling": {"label": "침 흘림", "op": "unassessed"},
+    "hair_loss": {"label": "탈모", "op": "unassessed"},
+    "potbelly": {"label": "배가 처지거나 불러 보임", "op": "unassessed"},
+    "panting": {"label": "헐떡거림", "op": "unassessed"},
+    "sneezing": {"label": "재채기", "op": "unassessed"},
+    "fever": {"label": "발열", "op": "unassessed"},
+    "skipping": {"label": "잠깐 다리를 들고 걷는 양상", "op": "unassessed"},
+    "joint_pain": {"label": "관절 부위 통증", "op": "unassessed"}
+  },
+  "profiles": [
+    {
+      "condition_id": "C01", "name": "당뇨병 관련 징후",
+      "symptoms": ["water_up", "urine_up", "food_up", "weight_loss"],
+      "note": "음수·배뇨·식욕 변화는 여러 원인과 겹칩니다. 현재 체중 한 번의 측정값으로 체중 감소를 판단하지 않습니다.",
+      "source_name": "Merck Veterinary Manual", "source_url": "https://www.merckvetmanual.com/endocrine-system/the-pancreas/diabetes-mellitus-in-dogs-and-cats"
+    },
+    {
+      "condition_id": "C02", "name": "만성 신장 질환 관련 징후",
+      "symptoms": ["water_up", "urine_up", "food_down", "vomiting"],
+      "note": "선택한 징후는 신장 질환 이외의 원인에서도 나타납니다. 진찰과 혈액·소변 검사 등으로 확인해야 합니다.",
+      "source_name": "VCA Animal Hospitals", "source_url": "https://vcahospitals.com/parkcrest/know-your-pet/kidney-failure-chronic-in-dogs"
+    },
+    {
+      "condition_id": "C03", "name": "위장관 질환·식이성 문제 관련 징후",
+      "symptoms": ["vomiting", "diarrhea", "food_down", "activity_down"],
+      "note": "구토·설사와 활동·식사 변화는 다양한 원인과 관련됩니다. 일치한 징후만으로 원인을 구분하지 않습니다.",
+      "source_name": "VCA Animal Hospitals", "source_url": "https://vcahospitals.com/fleming-island/know-your-pet/gastroenteritis-in-dogs"
+    },
+    {
+      "condition_id": "C04", "name": "위장관 이물·폐색 관련 징후",
+      "symptoms": ["vomiting", "food_down", "diarrhea", "pain", "dehydration"],
+      "note": "다른 위장관 질환과 징후가 겹칩니다. 이물 섭취가 의심되거나 반복 구토·복통이 있으면 병원에 바로 상담하세요.",
+      "source_name": "Cornell University College of Veterinary Medicine", "source_url": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-topics/gastrointestinal-foreign-body-obstruction-dogs"
+    },
+    {
+      "condition_id": "C05", "name": "호흡기 질환 관련 징후",
+      "symptoms": ["cough", "breathing", "nasal"],
+      "note": "기침은 특정 질환 하나를 가리키지 않습니다. 호흡곤란을 선택했다면 긴급 진료 안내를 우선 확인하세요.",
+      "source_name": "Cornell University College of Veterinary Medicine", "source_url": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-topics/canine-respiratory-disease-outbreaks"
+    },
+    {
+      "condition_id": "C06", "name": "기관 허탈 관련 징후",
+      "symptoms": ["cough", "breathing", "honking"],
+      "note": "일반적인 기침 응답만으로 기침의 소리나 기관 허탈 여부를 알 수 없습니다. 기침 형태를 추가로 확인해야 합니다.",
+      "source_name": "Cornell University College of Veterinary Medicine", "source_url": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-topics/tracheal-collapse"
+    },
+    {
+      "condition_id": "C07", "name": "골관절염 관련 징후",
+      "symptoms": ["gait", "activity_down", "stiffness", "stairs"],
+      "note": "보행 이상은 넓은 범주의 응답입니다. 관절 문제의 원인은 진찰로 확인해야 하며 체구나 나이를 증상 일치 수에 더하지 않습니다.",
+      "source_name": "Cornell University College of Veterinary Medicine", "source_url": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-topics/osteoarthritis"
+    },
+    {
+      "condition_id": "C08", "name": "위확장·염전 관련 긴급 징후",
+      "symptoms": ["bloat_retching", "collapse", "drooling", "pain"],
+      "note": "복부팽창을 동반한 헛구역질이나 실신 등 긴급 징후는 비교 개수에 관계없이 즉시 진료 안내를 따르세요. 하나의 복합 응답을 여러 개로 중복 계산하지 않습니다.",
+      "source_name": "American College of Veterinary Surgeons", "source_url": "https://www.acvs.org/small-animal/gastric-dilatation-volvulus/"
+    },
+    {
+      "condition_id": "C09", "name": "쿠싱증후군 관련 징후",
+      "symptoms": ["water_up", "urine_up", "food_up", "hair_loss", "potbelly", "panting"],
+      "note": "선택한 변화는 다른 원인에서도 나타납니다. 호흡곤란과 헐떡거림을 같은 항목으로 취급하지 않으며 진찰·검사가 필요합니다.",
+      "source_name": "Merck Veterinary Manual", "source_url": "https://www.merckvetmanual.com/endocrine-system/the-adrenal-glands/cushing-syndrome-hyperadrenocorticism-in-animals"
+    },
+    {
+      "condition_id": "C10", "name": "췌장염 관련 징후",
+      "symptoms": ["vomiting", "food_down", "diarrhea", "pain", "dehydration"],
+      "note": "문헌에서 선택한 징후는 모든 췌장염 사례에 나타나는 것은 아닙니다. 다른 원인과 겹치므로 진찰·영상·검사 결과를 함께 확인해야 합니다.",
+      "source_name": "Merck Veterinary Manual", "source_url": "https://www.merckvetmanual.com/digestive-system/the-exocrine-pancreas/pancreatitis-in-dogs-and-cats"
+    },
+    {
+      "condition_id": "C11", "name": "감염성 호흡기 질환 관련 징후",
+      "symptoms": ["cough", "food_down", "breathing", "sneezing", "nasal", "fever"],
+      "note": "감염성 호흡기 질환에서도 기침 등이 나타납니다. 최근 접촉·시설 이용·예방접종 정보를 함께 확인해야 합니다.",
+      "source_name": "Cornell University College of Veterinary Medicine", "source_url": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-information/bordetellosis"
+    },
+    {
+      "condition_id": "C12", "name": "슬개골 탈구 관련 징후",
+      "symptoms": ["gait", "skipping", "joint_pain"],
+      "note": "포괄적인 보행 이상 응답만으로 다리를 드는 특정 양상이나 통증을 확인할 수 없습니다. 소형견이라는 이유만으로 일치 수를 더하지 않습니다.",
+      "source_name": "American College of Veterinary Surgeons", "source_url": "https://www.acvs.org/small-animal/patellar-luxations/"
+    }
+  ]
+}
+

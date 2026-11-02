@@ -1,15 +1,14 @@
 """Streamlit Community Cloud 진입점: app.py"""
 import json
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from core import (DATA_PATH, MODEL_PATH, SCORES, SYMPTOMS, LABELS, FEATURES,
+from core import (MODEL_PATH, SCORES, SYMPTOMS, LABELS, FEATURES,
                   get_bundle, file_digest, analyze_record, batch_analyze, read_data)
-from health_guide import (RED_FLAGS, SOURCES, triage, related_conditions,
+from health_guide import (RED_FLAGS, SOURCES, triage,
                           size_guidance, age_guidance, daily_care)
-from risk_data import audit_csv, template_bytes
+from symptom_compare import load_profiles, compare_symptoms, comparison_summary
 
 
 def presentation_text(value):
@@ -30,7 +29,7 @@ def presentation_text(value):
 def presentation_frame(frame):
     data = frame.copy()
     data = data.rename(columns={c: presentation_text(c) for c in data.columns})
-    for column in ["데이터구분", "실제질병확률", "학습자료구분"]:
+    for column in ["데이터구분", "학습자료구분"]:
         if column in data:
             data[column] = data[column].map(presentation_text)
     return data
@@ -63,7 +62,7 @@ except (ValueError, OSError, ImportError) as exc:
 
 with st.sidebar:
     st.markdown("### DogCare AI")
-    page = st.radio("메뉴", ["강아지 상태 설문", "CSV 일괄 분석", "질병 확률 데이터", "모델·데이터", "사용 안내"], label_visibility="collapsed")
+    page = st.radio("메뉴", ["강아지 상태 설문", "CSV 일괄 분석", "증상 비교 자료", "모델·데이터", "사용 안내"], label_visibility="collapsed")
     st.divider()
     st.caption(f"학습 자료 {len(bundle['records'])}건")
     st.caption("생활 패턴과 비슷한 사례를 확인하는 교육용 프로젝트입니다.")
@@ -71,12 +70,37 @@ with st.sidebar:
 
 st.html('<div class="brand-kicker">DOGCARE AI / EVERYDAY OBSERVATIONS</div>')
 st.title("작은 변화를 기록하고,\n생활 패턴을 살펴보세요.")
-st.html('<div class="hero-copy">평소와 비교한 설문을 바탕으로 학습한 생활 패턴과 유사 사례를 확인합니다. 건강 참고정보에는 연결 이유와 출처를 함께 표시합니다.</div>')
-st.caption("교육용 합성 데이터 100건으로 학습한 모델입니다. 실제 관찰·확진 자료가 아니며, 질병을 진단하거나 실제 질병 발생 확률을 계산하지 않습니다.")
+st.html('<div class="hero-copy">평소와 비교한 설문으로 생활 패턴과 유사 사례를 확인합니다. 관련 증상 비교에서는 문헌과 일치한 징후, 미확인 항목과 출처를 함께 살펴봅니다.</div>')
+st.caption("생활 패턴 모델은 교육용 합성 데이터 100건으로 학습했습니다. 증상 비교는 수의학 문헌의 선택 항목과 응답을 대조합니다. 참고용이며 수의사의 진단을 대신하지 않습니다.")
 
 
 def source_link(source):
     st.markdown(f"[참고: {source[0]}]({source[1]})")
+
+
+# 코드 업데이트 전 세션에 남은 결과는 새 설문을 통해 갱신한다.
+if "analysis" in st.session_state and "comparisons" not in st.session_state.analysis:
+    del st.session_state.analysis
+
+
+def render_comparisons(comparisons, key):
+    st.caption("일치 수 / 비교 가능한 항목 수와 미확인 수를 표시합니다. 문헌의 모든 증상을 망라하지 않으며, 일치 수는 질환 순위·중증도·진료 우선순위를 뜻하지 않습니다.")
+    show_all = st.checkbox("일치 항목이 없는 문헌도 보기", key=key)
+    visible = [r for r in comparisons if show_all or r["matched_count"] > 0]
+    if not visible:
+        st.info("비교 가능한 항목에서 일치 징후가 없습니다. 질환이 없다는 의미는 아닙니다.")
+        return
+    st.dataframe(pd.DataFrame([{"ID": r["condition_id"], "관련 문헌 항목": r["name"],
+        "일치 수": r["matched_count"], "비교 가능한 수": r["assessed_count"],
+        "미확인 수": r["unassessed_count"]} for r in visible]), hide_index=True, width="stretch")
+    status_labels = {"matched": "일치", "not_reported": "해당 징후 응답 없음", "unknown": "미확인"}
+    for item in visible:
+        with st.expander(f"{item['name']} · {item['assessed_count']}개 비교 중 {item['matched_count']}개 일치 · 미확인 {item['unassessed_count']}개"):
+            st.dataframe(pd.DataFrame([{"문헌의 선택 징후": e["label"], "설문 응답": e["answer"],
+                "비교 결과": status_labels[e["status"]]} for e in item["evidence"]]), hide_index=True, width="stretch")
+            st.write(item["note"])
+            source_link((item["source_name"], item["source_url"]))
+    st.caption("미확인은 증상이 없다는 뜻이 아닙니다. 여러 질환에 같은 징후가 겹칠 수 있으며, 일치하지 않아도 질환을 배제할 수 없습니다.")
 
 
 def render_result(saved):
@@ -96,7 +120,7 @@ def render_result(saved):
     a.metric("학습된 생활 군집", result["pattern"]["name"])
     b.metric("같은 군집의 사례", f"{result['pattern']['rows']}건")
     c.metric("비교할 유사 사례", f"{len(result['neighbors'])}건")
-    pattern_tab, similar_tab, health_tab, profile_tab = st.tabs(["생활 변화 패턴", "유사 사례 비교", "건강 참고정보", "체중·나이·크기"])
+    pattern_tab, similar_tab, health_tab, profile_tab = st.tabs(["생활 변화 패턴", "유사 사례 비교", "관련 증상 비교", "체중·나이·크기"])
     with pattern_tab:
         st.write("**이번 입력에서 보고한 변화**")
         for text in result["changes"]:
@@ -119,21 +143,10 @@ def render_result(saved):
     with similar_tab:
         st.write("학습된 입력 표현에서 가까운 사례를 보여 줍니다.")
         st.dataframe(presentation_frame(result["neighbors"]), hide_index=True, width="stretch")
-        st.caption("모델거리는 작을수록 입력 특징이 가깝다는 뜻입니다. 유사도나 질병 발생 확률의 백분율이 아닙니다. 나이·체중·크기·복용 여부·설문·추가 증상을 함께 비교합니다.")
+        st.caption("모델거리는 작을수록 입력 특징이 가깝다는 뜻입니다. 나이·체중·크기·복용 여부·설문·추가 증상을 함께 비교합니다.")
     with health_tab:
-        st.write("**입력한 징후와 관련해 살펴볼 수 있는 질환 참고정보**")
-        st.caption("아래 연결은 고정된 증상 조건과 문헌을 이용합니다. 질환 순위·확률·진단 결과가 아니며 표시되지 않은 질환도 있을 수 있습니다.")
-        conditions = saved["conditions"]
-        if not conditions:
-            st.write("현재 입력과 연결되는 참고 항목이 없습니다. 건강 이상이 없다는 의미는 아닙니다.")
-        for item in conditions:
-            with st.expander(item["참고질환"], expanded=safety["level"] == "urgent"):
-                st.write("연결 이유: " + item["연결이유"])
-                st.write(item["확인정보"])
-                source_link((item["출처명"], item["출처URL"]))
-        st.divider()
-        st.write("**실제 질병 발생 확률: 산출할 수 없음**")
-        st.write(result["disease_probability"]["reason"])
+        st.write("**설문 응답과 문헌 징후의 비교**")
+        render_comparisons(saved["comparisons"], "result_show_all")
         st.write("**생활 관리와 상담 준비**")
         for text in daily_care(record):
             st.write("• " + text)
@@ -156,10 +169,12 @@ def render_result(saved):
         st.write(text); source_link(source)
         if record.get("견종"):
             st.caption("입력한 견종은 기록에 보존합니다. 학습 자료에 견종 열이 없어 견종별 위험도 계산에는 사용하지 않습니다.")
-    export = {**record, "AI가상라벨": result["virtual_label"], "생활패턴": result["pattern"]["name"],
+    export = {**record, "AI분류라벨": result["virtual_label"], "생활패턴": result["pattern"]["name"],
               "변화요약": ", ".join(result["changes"]), "진료안내": safety["title"],
-              "참고질환": "; ".join(i["참고질환"] for i in saved["conditions"]),
-              "실제질병발생확률": "산출 불가", "학습자료구분": "가상_데모"}
+              "증상비교요약": comparison_summary(saved["comparisons"]), "학습자료구분": "교육용 합성 데이터"}
+    for item in saved["comparisons"]:
+        for field, label in [("matched_count", "일치수"), ("assessed_count", "비교수"), ("unassessed_count", "미확인수")]:
+            export[f"{item['condition_id']}_{label}"] = item[field]
     st.download_button("분석 기록 CSV 내려받기", pd.DataFrame([export]).to_csv(index=False).encode("utf-8-sig"), "DogCareAI_result.csv", "text/csv")
 
 
@@ -191,10 +206,10 @@ if page == "강아지 상태 설문":
         record = {"이름": name, "견종": breed, "나이_세": age, "체중_kg": weight,
                   "크기": size, "약물복용": medicine, **values, **symptoms}
         try:
-            result = analyze_record(record, bundle)
+            result = analyze_record(record, bundle, red_flags=red_flags)
             safety = triage(record, red_flags, duration_hours=24 if duration=="24시간 이상" else 0, persistent_cough=persistent)
             st.session_state.analysis = {"record": record, "analysis": result, "safety": safety,
-                                         "conditions": related_conditions(record, red_flags)}
+                                         "comparisons": result["symptom_comparisons"]}
         except (ValueError, OSError) as exc:
             st.error(presentation_text(exc))
     if "analysis" in st.session_state:
@@ -203,55 +218,34 @@ if page == "강아지 상태 설문":
 elif page == "CSV 일괄 분석":
     st.header("CSV 일괄 분석")
     st.write("학습에 사용한 것과 같은 13개 입력 열이 있는 CSV를 올리세요. 라벨과 ID가 없어도 분석할 수 있습니다.")
-    st.caption("이 화면은 학습 라벨 분류·군집 분석용입니다. CSV에는 긴급 증상·지속 시간 입력이 없으므로 개별 진료 안내는 설문에서 확인하세요.")
+    st.caption("생활 패턴과 문헌 증상 비교를 함께 제공합니다. CSV에 없는 긴급 징후는 미확인으로 처리합니다. 개별 진료 안내는 설문에서 확인하세요.")
     uploaded = st.file_uploader("분석할 CSV", type=["csv"])
     if uploaded:
         try:
             data = read_data(uploaded)
             result = batch_analyze(data, bundle)
             st.dataframe(presentation_frame(result), hide_index=True, width="stretch")
-            st.download_button("일괄 분석 CSV 내려받기", result.to_csv(index=False).encode("utf-8-sig"), "DogCareAI_batch.csv", "text/csv")
+            st.download_button("일괄 분석 CSV 내려받기", presentation_frame(result).to_csv(index=False).encode("utf-8-sig"), "DogCareAI_batch.csv", "text/csv")
+            row_number = st.number_input("증상 비교 상세를 볼 행 (CSV 머리글 제외)", min_value=1, max_value=len(data), value=1, step=1)
+            render_comparisons(compare_symptoms(data.iloc[int(row_number)-1]), "batch_show_all")
         except (ValueError, OSError, pd.errors.ParserError) as exc:
             st.error(presentation_text(exc))
 
-elif page == "질병 확률 데이터":
-    st.header("실제 발병 확률을 위한 데이터 점검")
-    st.write("인터넷의 질환 설명은 증상과 검사 정보를 알려 줍니다. 개별 강아지의 실제 발병 확률을 학습하려면, 기준 시점 이후 실제로 발병했는지 확인한 기록이 필요합니다.")
-    st.info("현재 제공하는 기능은 자료 구조 점검과 수집 양식입니다. 질환별 발병 예측모델은 아직 학습·검증하지 않았습니다.")
-    a,b = st.columns(2)
-    source_choice = a.radio("점검 자료", ["현재 학습 CSV", "별도 관찰 자료 CSV"])
-    horizon_days = b.selectbox("점검할 관찰 기간 (일)", [30,90,180,365], index=1,
-                              help="기준일 뒤 이 기간 안에 새로 발병했는지 기록으로 확인합니다. 이 선택만으로 예측 확률이 생성되지는 않습니다.")
-    source = DATA_PATH
-    if source_choice == "별도 관찰 자료 CSV":
-        source = st.file_uploader("진단·추적 항목이 있는 CSV", type=["csv"], key="risk_csv")
-    if source is not None:
-        try:
-            audit = audit_csv(source, horizon_days)
-            a,b,c = st.columns(3)
-            a.metric("기록", f"{audit['rows']}행")
-            b.metric("합성 데이터 표시", f"{audit['synthetic_rows']}행")
-            c.metric("실제 관찰로 표시", f"{audit['real_marked_rows']}행")
-            st.caption(audit["scope"])
-            if audit["missing_fields"]:
-                st.warning("발병 결과 점검에 필요한 열이 부족합니다. 없는 확진·발병 정보를 증상이나 인터넷 설명으로 채우지 않습니다.")
-                st.dataframe(pd.DataFrame({"부족한 항목": audit["missing_fields"]}), hide_index=True)
-            else:
-                counts = audit["outcome_counts"]
-                names = {"observed_event":"기간 내 발병 확인", "observed_no_event":"전체 기간 미발병 확인",
-                         "censored":"추적 기간 부족", "baseline_excluded":"기준 시점의 질환 없음이 확인되지 않아 제외", "invalid":"입력 오류"}
-                st.dataframe(pd.DataFrame([{"기록 구분": label, "행 수": counts.get(key,0)} for key,label in names.items()]), hide_index=True)
-                if audit["errors"]:
-                    st.dataframe(pd.DataFrame(audit["errors"]), hide_index=True)
-                st.write(audit["model_status"])
-            st.caption("관찰 기간이 끝나기 전에 추적이 중단된 기록을 미발병으로 취급하지 않습니다. 기준 시점에 이미 있던 질병도 새 발병으로 학습하지 않습니다.")
-        except (ValueError, OSError) as exc:
-            st.error(presentation_text(exc))
-    st.subheader("실제 자료 수집 양식")
-    st.download_button("진단·추적 자료 CSV 양식 내려받기", template_bytes(), "clinical_outcomes_template.csv", "text/csv")
-    st.write("한 행은 한 강아지의 한 기준일·한 질환에 대한 관찰 기록입니다. 임상 기록에 근거해 확진일과 관찰 종료일을 입력하고, 같은 강아지에는 같은 개체ID를 사용하세요.")
-    st.caption("CSV 형식이 완성되어도 확률 기능이 자동으로 활성화되지는 않습니다. 실제 자료로 질환별 모델을 개발하고, 별도 자료에서 확률 보정과 외부 검증을 해야 합니다.")
-    st.link_button("자료 작성 방법", "https://github.com/blue13244/DogCareAI/blob/main/CLINICAL_DATA.md")
+elif page == "증상 비교 자료":
+    st.header("증상 비교 자료")
+    st.write("Merck Veterinary Manual, Cornell 수의과대학, ACVS, VCA의 자료에서 선택한 징후를 비교합니다. 아래 목록은 진단 순서가 아닌 고정된 자료 순서입니다.")
+    if "analysis" in st.session_state:
+        st.subheader("마지막 설문 응답과 비교")
+        render_comparisons(st.session_state.analysis["comparisons"], "library_show_all")
+    else:
+        st.info("설문을 분석하면 이 화면에서도 일치·미확인 개수와 항목별 응답을 확인할 수 있습니다.")
+    st.subheader("12개 문헌 항목과 출처")
+    reference = load_profiles()
+    for item in reference["profiles"]:
+        with st.expander(f"{item['condition_id']} · {item['name']}"):
+            st.write("비교에 사용하는 선택 징후: " + ", ".join(reference["symptoms"][key]["label"] for key in item["symptoms"]))
+            st.write(item["note"])
+            source_link((item["source_name"], item["source_url"]))
 
 elif page == "모델·데이터":
     st.header("모델과 학습 데이터")
@@ -287,13 +281,15 @@ else:
     st.markdown("""1. 강아지 기본 정보와 평소 대비 생활 변화를 입력합니다.
 2. 추가 증상과 긴급 징후를 확인합니다.
 3. 분석 버튼을 눌러 생활 군집, 사례 유형, 가까운 사례를 봅니다.
-4. 연결 이유와 출처가 표시된 건강 참고정보를 읽고 필요한 내용을 상담에 활용합니다.
+4. 관련 증상 비교에서 일치한 징후, 응답, 미확인 항목과 원문 출처를 확인합니다.
 
 입력 내용은 파일이나 데이터베이스에 자동으로 저장하지 않습니다. 필요한 경우 결과 CSV를 직접 내려받을 수 있습니다.
 
-**실제 질병 발생 확률을 제공하지 않는 이유**
+**비교 결과 읽는 방법**
 
-현재 학습 자료는 확진·추적 결과가 없는 교육용 합성 데이터입니다. 모델의 학습 라벨 분류값, 군집 거리, 유사 사례의 라벨 비율을 질병 확률로 바꿔 표시하지 않습니다. 실제 발병 예측은 질환별 확진 결과, 기준 시점, 추적 기간, 대표성 있는 실제 자료와 독립 검증이 필요합니다.
+예를 들어 ‘3개 비교 중 2개 일치, 미확인 1개’는 문헌에서 선택한 4개 징후 중 설문으로 3개를 확인했고 그중 2개가 일치했다는 뜻입니다. 미확인은 증상이 없다는 뜻이 아닙니다. 문헌의 모든 증상을 포함하지 않으며, 일치 수로 질환의 우선순위나 중증도를 정하지 않습니다. 일치하지 않아도 질환을 배제할 수 없습니다.
+
+생활 변화 1·2는 감소, 3은 평소와 같음, 4·5는 증가로 비교합니다. 단일 체중으로 체중 감소를 추정하지 않고, 수면시간·나이·크기·약물복용은 증상 일치 수에 더하지 않습니다. CSV에 없는 긴급 징후는 미확인으로 남깁니다. 진료 안내는 증상 일치 개수와 별도로 적용됩니다.
 """)
     st.link_button("전체 코드와 배포 설명", "https://github.com/blue13244/DogCareAI")
     for source in SOURCES.values():

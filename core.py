@@ -22,6 +22,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.neighbors import NearestNeighbors
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from symptom_compare import compare_symptoms, comparison_summary
 
 ROOT = Path(__file__).resolve().parent
 DATA_PATH = ROOT / "data" / "dog_data.csv"
@@ -248,7 +249,7 @@ def weight_comparison(record, records):
             "scope": "같은 크기의 가상 자료 평균입니다. 적정 체중·비만 판정 기준이 아닙니다."}
 
 
-def analyze_record(record: dict, bundle, top_k=5, exclude_id=None):
+def analyze_record(record: dict, bundle, top_k=5, exclude_id=None, red_flags=None):
     frame = validate_data(pd.DataFrame([record]))
     row = frame.iloc[0]
     features = frame[FEATURES]
@@ -270,20 +271,26 @@ def analyze_record(record: dict, bundle, top_k=5, exclude_id=None):
                          "가상라벨": match[TARGET], "모델거리": round(float(distance), 3)})
         if len(selected) >= top_k:
             break
-    # 확진 결과와 추적 기간이 없는 현재 자료로 실제 질병 발생 확률을 산출하지 않는다.
     return {"virtual_label": predicted, "virtual_label_display": LABEL_DISPLAY[predicted],
             "pattern": bundle["profiles"][cluster_id], "changes": changes(row),
             "neighbors": pd.DataFrame(selected), "weight": weight_comparison(row, bundle["records"]),
-            "disease_probability": {"available": False, "value": None,
-                "reason": "확진 진단, 관찰 시작 시점, 추적 기간, 신규 발병 결과와 외부 검증 자료가 없습니다."}}
+            "symptom_comparisons": compare_symptoms(row, red_flags)}
 
 
 def batch_analyze(frame, bundle):
     data = validate_data(frame)
-    result = data.copy()
+    # 이전 버전에서 내려받은 결과를 올려도 폐지한 출력 열을 다시 내보내지 않는다.
+    retired = [c for c in data.columns if ("질병" in c and "확률" in c) or c == "disease_probability"]
+    result = data.drop(columns=retired).copy()
     result["AI가상라벨"] = bundle["classifier"].predict(data[FEATURES])
     clusters = bundle["clusterer"].predict(bundle["embedding"].transform(data[FEATURES]))
     result["생활패턴"] = [bundle["profiles"][int(i)]["name"] for i in clusters]
     result["변화요약"] = data.apply(lambda r: ", ".join(changes(r)), axis=1)
-    result["실제질병확률"] = "산출 불가: 가상 라벨 자료"
+    comparisons = [compare_symptoms(row) for _, row in data.iterrows()]
+    result["증상비교요약"] = [comparison_summary(items) for items in comparisons]
+    for profile in comparisons[0]:
+        cid = profile["condition_id"]
+        for key, label in [("matched_count", "일치수"), ("assessed_count", "비교수"), ("unassessed_count", "미확인수")]:
+            result[f"{cid}_{label}"] = [next(item[key] for item in items if item["condition_id"] == cid) for items in comparisons]
     return result
+

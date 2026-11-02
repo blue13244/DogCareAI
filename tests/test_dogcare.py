@@ -57,10 +57,10 @@ class DogCareTests(unittest.TestCase):
         expected = int(self.bundle['clusterer'].predict(self.bundle['embedding'].transform(frame[core.FEATURES]))[0])
         self.assertEqual(result['pattern']['cluster'], expected)
 
-    def test_no_fabricated_disease_probability(self):
-        p = core.analyze_record(self.record, self.bundle)['disease_probability']
-        self.assertFalse(p['available'])
-        self.assertIsNone(p['value'])
+    def test_comparison_replaces_probability_field(self):
+        result = core.analyze_record(self.record, self.bundle)
+        self.assertNotIn('disease_probability', result)
+        self.assertEqual(len(result['symptom_comparisons']), 12)
 
     def test_nearest_cases_and_exclusion(self):
         result = core.analyze_record(self.record, self.bundle, exclude_id='D01')
@@ -114,9 +114,14 @@ class DogCareTests(unittest.TestCase):
         self.assertIn('가슴',size_guidance('대형견')[0])
 
     def test_batch_predictions(self):
-        out = core.batch_analyze(self.data.head(5),self.bundle)
+        data = self.data.head(5).copy()
+        data['실제질병확률'] = '이전 결과'
+        out = core.batch_analyze(data,self.bundle)
         self.assertEqual(len(out),5)
-        self.assertTrue(out['실제질병확률'].str.startswith('산출 불가').all())
+        self.assertNotIn('실제질병확률', out.columns)
+        self.assertIn('증상비교요약', out.columns)
+        self.assertTrue((out['C08_미확인수'] == 4).all())
+        self.assertEqual(out['C01_일치수'].iloc[0], sum(self.record[c] > 3 for c in ['음수량','배뇨량','식사량']))
 
     def test_bad_provenance_not_accepted(self):
         data = self.data.copy(); data.loc[0,'데이터구분']='실제_확진'
@@ -126,3 +131,4 @@ class DogCareTests(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+
